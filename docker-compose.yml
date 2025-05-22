@@ -1,0 +1,81 @@
+# To use this set up you need to run th compose file, create the kibana service token and add it to the environment variables,
+# then restart the kibana service.Then log onto the elastic ui and install the APM integration with .
+#host = apm-server:8200
+#URL: http://apm-server:8200
+
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=true
+      - xpack.security.transport.ssl.enabled=false
+      - xpack.security.http.ssl.enabled=false
+      - ELASTIC_PASSWORD=password
+    volumes:
+      - ./data:/usr/share/elasticsearch/data
+    ports:
+      - 9200:9200
+    networks:
+      - elastic
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.13.4
+    container_name: kibana
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      # error:security_exception: failed to authenticate service account [elastic/kibana] with token name [kibana-system]
+      # run this and restart: docker exec -it elasticsearch elasticsearch-service-tokens create elastic/kibana kibana-system
+      # then; docker compose up -d --force-recreate kibana
+      - ELASTICSEARCH_SERVICEACCOUNTTOKEN=AAEAAWVsYXN0aWMva2liYW5hL2tpYmFuYS1zeXN0ZW06TWw1NWMyTmVUNFN6cXJubGlJOVB3UQ
+      - XPACK_SECURITY_SESSION_IDLETIMEOUT=8h
+      - XPACK_SECURITY_SESSION_LIFESPAN=24h
+
+    ports:
+      - 5601:5601
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:5601" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - elastic
+
+  apm-server:
+    image: docker.elastic.co/apm/apm-server:8.13.4
+    container_name: apm-server
+    ports:
+      - 8200:8200
+    command: >
+      apm-server -e
+        -E apm-server.auth.api_key.enabled=false
+        -E output.elasticsearch.hosts=["http://elasticsearch:9200"]
+        -E output.elasticsearch.username=elastic
+        -E output.elasticsearch.password=password
+        -E output.elasticsearch.ssl.verification_mode=none
+    depends_on:
+      kibana:
+        condition: service_healthy
+    networks:
+      - elastic
+
+  fastapi-app:
+    build: .
+    container_name: fastapi-app
+    environment:
+      - OTEL_RESOURCE_ATTRIBUTES=service.name=fastapi-otel,deployment.environment=local
+      - OTEL_TRACES_EXPORTER=otlp
+      - OTEL_METRICS_EXPORTER=otlp
+      - OTEL_LOGS_EXPORTER=otlp
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://apm-server:8200    # Send all telemetry to APM Server (OTLP)
+      - OTEL_EXPORTER_OTLP_INSECURE=true                     # Use HTTP/insecure (since no TLS in local stack)
+      - OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED=true  # Enable auto-capture of logs:contentReference[oaicite:2]{index=2}
+    ports:
+      - "8000:8000"
+    networks:
+      - elastic
+
+networks:
+  elastic:
+    driver: bridge
