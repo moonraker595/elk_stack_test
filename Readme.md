@@ -2,6 +2,8 @@
 
 This repository demonstrates how to use the Elastic Stack (Elasticsearch, Kibana, and APM Server) to observe a basic web application using OpenTelemetry automatic instrumentation.
 
+It uses [EDOT](https://www.elastic.co/observability-labs/blog/elastic-distributions-opentelemetry) (Elastic Distribution of OpenTelemetry) to collect and export telemetry data to the Elastic Stack.
+
 The web application is a simple FastAPI service that returns a JSON message when accessed at:
 
 `curl http://localhost:8000/`
