@@ -1,4 +1,4 @@
-# Test ELK Observability Stack with a Simple Web Application
+# Local ELK Observability Test Stack with a Simple FastAPI Web Application
 
 This repository demonstrates how to use the Elastic Stack (Elasticsearch, Kibana, and APM Server) to observe a basic web application using OpenTelemetry automatic instrumentation.
 
